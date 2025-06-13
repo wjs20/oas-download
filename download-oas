@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# 
+# Download all paired OAS sequences
+
+DOWNLOAD_DIR="${HOME}"/Downloads/oas_paired
+
+test -d $DOWNLOAD_DIR || mkdir -p $DOWNLOAD_DIR
+
+BASE_PATH="https://opig.stats.ox.ac.uk/webapps/ngsdb/paired/"
+
+parallel -a oas_paired_urls.txt --eta -j 11 curl --output-dir $DOWNLOAD_DIR -O {}
+
+
