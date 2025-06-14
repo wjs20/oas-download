@@ -5,7 +5,7 @@ cd "$OAS_DOWNLOAD_DIR"
 
 extract_json() {
   file="$1"
-  json=$(zcat "$file" | sed -n 1p | sed -e 's/""/"/g;s/^.//;s/.$//' | jq -c . 2>/dev/null)
+  json=$(zcat "$file" | head -n1 | sed -e 's/""/"/g;s/^.//;s/.$//' | jq -c . 2>/dev/null)
   if [ -n "$json" ]; then
     echo "{\"${file##*/}\": $json}"
   fi
