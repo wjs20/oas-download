@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
-# 
+#
 # Download all paired OAS sequences
 
-DOWNLOAD_DIR="${HOME}"/Downloads/oas_paired
+export OAS_DOWNLOAD_DIR="${HOME}/Downloads/oas_paired"
+mkdir -p "$OAS_DOWNLOAD_DIR"
 
-test -d $DOWNLOAD_DIR || mkdir -p $DOWNLOAD_DIR
+echo "Downloading OAS database to $OAS_DOWNLOAD_DIR"
 
-BASE_PATH="https://opig.stats.ox.ac.uk/webapps/ngsdb/paired/"
+download_url() {
+  curl -sSL -o "$1/$(basename "$2")" "$2"
+}
 
-parallel -a oas_paired_urls.txt --eta -j 11 curl --output-dir $DOWNLOAD_DIR -O {}
+export -f download_url
 
-
+if type parallel >/dev/null 2>&1; then
+    echo 'using parallel'
+    parallel --eta download_url "$OAS_DOWNLOAD_DIR" :::: oas_paired_urls.txt
+else
+    echo 'using xargs'
+    xargs -P "$(nproc)" -a oas_paired_urls.txt -I{} bash -c 'curl -sSL -o "$0/$(basename "$1")" "$1"' "$OAS_DOWNLOAD_DIR" {}
+fi
