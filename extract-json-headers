@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+OAS_DOWNLOAD_DIR="$HOME/Downloads/oas_paired/"
+cd "$OAS_DOWNLOAD_DIR"
+
+extract_json() {
+  file="$1"
+  json=$(zcat "$file" | sed -n 1p | sed -e 's/""/"/g;s/^.//;s/.$//' | jq -c . 2>/dev/null)
+  if [ -n "$json" ]; then
+    echo "{\"${file##*/}\": $json}"
+  fi
+}
+
+export -f extract_json
+
+find . -name '*.csv.gz' -print0 | xargs -0 -n1 -P8 bash -c 'extract_json "$0"' | jq -s 'add'
