@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import os
 import gzip
 import polars as pl
 from pathlib import Path
@@ -260,13 +259,19 @@ def build_schema(columns: List[str]) -> Dict[str, pl.DataType]:
     }
 
 
-def process_file(input_path: Path, output_path: Path, schema: Dict[str, pl.DataType]):
+def process_file(
+    input_path: Path, output_path: Path, schema: Dict[str, pl.DataType], metadata
+):
     try:
         with gzip.open(input_path, "rt", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
+            if len(lines[1].split(",")) != 198:
+                raise ValueError("Trucated columns")
             csv_data = "".join(lines[1:])  # skip malformed header
 
-        df = pl.read_csv(csv_data.encode("utf-8"), dtypes=schema, ignore_errors=True)
+        df = pl.read_csv(
+            csv_data.encode("utf-8"), schema_overrides=schema, ignore_errors=True
+        )
         df = df.select(list(schema.keys()))
         df = df.with_columns(
             [
@@ -278,7 +283,9 @@ def process_file(input_path: Path, output_path: Path, schema: Dict[str, pl.DataT
                 .str.replace_all(" ", ""),
             ]
         )
-
+        df = df.with_columns(
+            *(pl.lit(value).alias(field) for field, value in metadata.items())
+        )
         df.write_parquet(output_path)
         logging.info(f"Processed {input_path.name} successfully.")
     except Exception as e:
@@ -287,23 +294,20 @@ def process_file(input_path: Path, output_path: Path, schema: Dict[str, pl.DataT
     return None
 
 
-def main(input_dir: str, output_dir: str, column_file: str):
-    input_path = Path(input_dir)
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
+def main(input_dir: Path, output_dir: Path, column_file: Path):
+    output_dir.mkdir(parents=True, exist_ok=True)
     column_names = read_column_names(Path(column_file))
     schema = build_schema(column_names)
-
+    metadata = json.loads(Path("metadata.json").read_text())
     log = {}
-    for file in input_path.glob("*.csv.gz"):
-        out_file = output_path / (file.stem + ".parquet")
-        error = process_file(file, out_file, schema)
+    for file in input_dir.glob("*.csv.gz"):
+        out_file = output_dir / (file.with_suffix(".parquet"))
+        error = process_file(file, out_file, schema, metadata[file.name])
         if error:
             log[file.name] = error
 
     if log:
-        log_file = output_path / "failed_files.log"
+        log_file = output_dir / "failed_files.log"
         with open(log_file, "w") as f:
             for fname, errmsg in log.items():
                 f.write(f"{fname}: {errmsg}\n")
@@ -316,8 +320,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("input_dir")
-    parser.add_argument("output_dir")
-    parser.add_argument("column_file")
+    parser.add_argument("input_dir", type=Path)
+    parser.add_argument("output_dir", type=Path)
+    parser.add_argument("column_file", type=Path)
     args = parser.parse_args()
     main(args.input_dir, args.output_dir, args.column_file)
