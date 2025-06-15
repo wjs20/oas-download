@@ -301,7 +301,7 @@ def main(input_dir: Path, output_dir: Path, column_file: Path):
     metadata = json.loads(Path("metadata.json").read_text())
     log = {}
     for file in input_dir.glob("*.csv.gz"):
-        out_file = output_dir / (file.with_suffix(".parquet"))
+        out_file = output_dir / file.with_suffix(".parquet").name
         error = process_file(file, out_file, schema, metadata[file.name])
         if error:
             log[file.name] = error
