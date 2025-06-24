@@ -284,7 +284,10 @@ def process_file(
             ]
         )
         df = df.with_columns(
-            *(pl.lit(value).alias(field) for field, value in metadata.items())
+            *(
+                pl.lit(value).cast(pl.String).alias(field)
+                for field, value in metadata.items()
+            )
         )
         df.write_parquet(output_path)
         logging.info(f"Processed {input_path.name} successfully.")
