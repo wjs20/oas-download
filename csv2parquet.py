@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import gzip
+import gzip
 import argparse
 import json
 import polars as pl
@@ -7,7 +9,7 @@ from typing import List, Dict
 import logging
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 TYPE_MAPPING = {
@@ -145,6 +147,18 @@ RAW_TYPE_DICT = {
 }
 
 
+def build_schema(columns: List[str], paired: bool = False) -> Dict[str, pl.DataType]:
+    if paired:
+        type_dict = {
+            k + suffix: v
+            for k, v in RAW_TYPE_DICT.items()
+            for suffix in ("_heavy", "_light")
+        }
+    else:
+        type_dict = RAW_TYPE_DICT
+    return {col: TYPE_MAPPING[type_dict[col]] for col in columns}
+
+
 def parse_user_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("input_dir", type=Path)
@@ -153,26 +167,9 @@ def parse_user_args():
     return parser.parse_args()
 
 
-def build_schema(columns: List[str], paired: bool = False) -> Dict[str, pl.DataType]:
-    """
-    Build the schema from an input columns list. Used to specify the column types in constructed polars dataframes.
-
-    Args:
-        columns: list of columns found in csvs to be converted to parquets.
-        paired: boolean indicating whether the schema will be used to construct parquets for the paired antibody database,
-        or for the unpaired antibody database. If paired, each column is appended with '_heavy' or '_light'.
-    """
-    if paired:
-        type_mapping = {
-            k + suffix: v
-            for suffix in ("_heavy", "_light")
-            for k, v in RAW_TYPE_DICT.items()
-        }
-    else:
-        type_mapping = TYPE_MAPPING
-    return {col: type_mapping[RAW_TYPE_DICT[col]] for col in columns}
-
-    column_names = read_column_names(Path(column_file))
+def main(input_dir: Path, output_dir: Path, column_file: Path):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    column_names = json.loads(Path(column_file).read_text())
     schema = build_schema(column_names)
     for file in input_dir.glob("*.csv.gz"):
         output_path = (output_dir / file.name).with_suffix(".parquet")
