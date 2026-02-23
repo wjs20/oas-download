@@ -164,13 +164,14 @@ def parse_user_args():
     parser.add_argument("input_dir", type=Path)
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("column_file", type=Path)
+    parser.add_argument("--paired", store=True, required=False, default=False)
     return parser.parse_args()
 
 
-def main(input_dir: Path, output_dir: Path, column_file: Path):
+def main(input_dir: Path, output_dir: Path, column_file: Path, paired: bool):
     output_dir.mkdir(parents=True, exist_ok=True)
     column_names = json.loads(Path(column_file).read_text())
-    schema = build_schema(column_names)
+    schema = build_schema(column_names, paired)
     for file in input_dir.glob("*.csv.gz"):
         output_path = (output_dir / file.name).with_suffix(".parquet")
         try:
@@ -183,4 +184,4 @@ def main(input_dir: Path, output_dir: Path, column_file: Path):
 
 if __name__ == "__main__":
     args = parse_user_args()
-    main(args.input_dir, args.output_dir, args.column_file)
+    main(args.input_dir, args.output_dir, args.column_file, args.paired)
